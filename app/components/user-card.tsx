@@ -1,21 +1,16 @@
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Phone, Mail, MapPin } from 'lucide-react'
-
-interface User {
-  id: string
-  name: string
-  phoneNumber: string
-  email?: string
-  location?: string
-}
+import { UserDialog } from './user-dialog'
+import { User } from '@/app/actions/schemas'
 
 interface UserCardProps {
   user: User
+  onEdit: (updatedUser: User) => void
 }
 
-export function UserCard({ user }: UserCardProps) {
+export function UserCard({ user, onEdit }: UserCardProps) {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="flex flex-row items-center gap-4">
@@ -46,6 +41,10 @@ export function UserCard({ user }: UserCardProps) {
           </div>
         )}
       </CardContent>
+      <CardFooter>
+        <UserDialog user={user} onEdit={onEdit} />
+      </CardFooter>
     </Card>
   )
 }
+

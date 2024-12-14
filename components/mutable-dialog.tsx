@@ -1,116 +1,96 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { useState, useEffect } from 'react';
-import { useForm, UseFormReturn, FieldValues, DefaultValues } from 'react-hook-form';
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { toast } from 'sonner';
-import { ZodType } from 'zod';
+import { useState } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { useForm, UseFormReturn, FieldValues, DefaultValues } from 'react-hook-form'
+import { ZodSchema } from 'zod'
 
-export interface ActionState <T>{
-    success: boolean;
-    message: string | null;
-    data?: T;
-  }
-interface GenericDialogProps<T extends FieldValues> {
-  formSchema: ZodType<T>;
-  FormComponent: React.ComponentType<{ form: UseFormReturn<T> }>;
-  action?: (data: T) => Promise<ActionState<T>>;
-  triggerButtonLabel?: string;
-  addDialogTitle?: string;
-  editDialogTitle?: string;
-  dialogDescription?: string;
-  submitButtonLabel?: string;
-  defaultValues?: DefaultValues<T>; // If present, this will indicate edit mode
+export interface ActionState<T> {
+  success: boolean
+  message: string
+  data?: T
 }
 
-export default function MutableDialog<T extends FieldValues>({
+interface MutableDialogProps<TFormData extends FieldValues, TResponseData> {
+  formSchema: ZodSchema
+  FormComponent: React.ComponentType<{ form: UseFormReturn<TFormData> }>
+  action: (data: TFormData) => Promise<ActionState<TResponseData>>
+  triggerButtonLabel: string
+  addDialogTitle: string
+  editDialogTitle: string
+  dialogDescription: string
+  submitButtonLabel: string
+  defaultValues?: DefaultValues<TFormData>
+  isSubmitting: boolean
+  onNotification: (notification: { type: 'success' | 'error', message: string } | null) => void
+}
+
+export default function MutableDialog<TFormData extends FieldValues, TResponseData>({
   formSchema,
   FormComponent,
-  action, 
+  action,
+  triggerButtonLabel,
+  addDialogTitle,
+  editDialogTitle,
+  dialogDescription,
+  submitButtonLabel,
   defaultValues,
-  triggerButtonLabel = defaultValues ? 'Edit' : 'Add',
-  addDialogTitle = 'Add',
-  editDialogTitle = 'Edit',
-  dialogDescription = defaultValues ? 'Make changes to your item here. Click save when you\'re done.' : 'Fill out the form below to add a new item.',
-  submitButtonLabel = defaultValues ? 'Save' : 'Add',
-}: GenericDialogProps<T>) {
-  const [open, setOpen] = useState(false);
-
-  const form = useForm<T>({
+  isSubmitting,
+  onNotification,
+}: MutableDialogProps<TFormData, TResponseData>) {
+  const [open, setOpen] = useState(false)
+  const form = useForm<TFormData>({
     resolver: async (values) => {
       try {
-        console.log('Form values before validation:', values); // Log the form values before validation
-        const result = formSchema.parse(values);
-        console.log('Validation passed:', result); // Log the result after validation
-        return { values: result, errors: {} };
+        const result = formSchema.parse(values)
+        return { values: result, errors: {} }
       } catch (err: any) {
-        
-        console.log('Validation errors:', err.formErrors?.fieldErrors); // Log the validation errors
-        return { values: {}, errors: err.formErrors?.fieldErrors };
+        return { values: {}, errors: err.formErrors?.fieldErrors }
       }
     },
     defaultValues: defaultValues,
-  });
+  })
 
-  // Reset the form when the dialog is closed
-  useEffect(() => {
-    if (!open) {
-      form.reset();
-    }
-  }, [open, form]);
-
-  async function handleSubmit(data: T) {
-    if (!action) {
-      throw new Error("No action function provided");
-    }
-
-    console.log('calling submit');
-    const actions = await action(data);  // Call the provided action directly
-
-    console.log('actions:', actions);
-
-    if (actions.success) {
-      const toastMessage = actions.message;
-      toast.success(toastMessage);
+  const onSubmit = async (data: TFormData) => {
+    const result = await action(data)
+    if (result.success) {
+      form.reset()
+      setOpen(false)
+      onNotification({ type: 'success', message: result.message })
     } else {
-      const toastMessage = actions.message;
-      toast.error(toastMessage);
+      onNotification({ type: 'error', message: result.message })
     }
-    setOpen(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      setOpen(newOpen)
+      if (!newOpen) {
+        onNotification(null)
+      }
+    }}>
       <DialogTrigger asChild>
-        <Button >{triggerButtonLabel}</Button>
+        <Button variant="outline">{triggerButtonLabel}</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{defaultValues ? editDialogTitle : addDialogTitle}</DialogTitle>
-          <DialogDescription>
-            {dialogDescription}
-          </DialogDescription>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(handleSubmit)}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
           <FormComponent form={form} />
-          <div className="mt-4">
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Close</Button>
-              <Button type="submit">{submitButtonLabel}</Button>
-            </DialogFooter>
+          <div className="mt-4 flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Submitting...' : submitButtonLabel}
+            </Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
+
